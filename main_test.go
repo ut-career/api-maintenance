@@ -26,19 +26,24 @@ func Test_isValidRetryAfter(t *testing.T) {
 	}
 }
 
+func setUpEnv(t *testing.T, key string, value string) {
+	prev, ok := os.LookupEnv(key)
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatal("os.Setenvに失敗")
+	}
+	if ok {
+		t.Cleanup(func(){ os.Setenv(key, prev) })
+	} else {
+		t.Cleanup(func(){ os.Unsetenv(key) })
+	}
+}
+
 func Test_handler(t *testing.T) {
 	const ENV_KEY = "RETRY_AFTER"
+	const SUCCESS_ENV_VALUE = "Mon, 02 Jan 2006 15:04:05 GMT"
 	t.Run("環境変数RETRY_AFTERがMon, 02 Jan 2006 15:04:05 GMTのとき、503で終了しRetry-AfterヘッダがMon, 02 Jan 2006 15:04:05 GMT", func(t *testing.T) {
-		prev, ok := os.LookupEnv(ENV_KEY)
-		const expected = "Mon, 02 Jan 2006 15:04:05 GMT"
-		if err := os.Setenv(ENV_KEY, expected); err != nil {
-			t.Fatal("os.Setenvに失敗")
-		}
-		if ok {
-			t.Cleanup(func(){ os.Setenv(ENV_KEY, prev) })
-		} else {
-			t.Cleanup(func(){ os.Unsetenv(ENV_KEY) })
-		}
+		const expected = SUCCESS_ENV_VALUE
+		setUpEnv(t, ENV_KEY, expected)
 
 		testHandler := http.HandlerFunc(handler)
 		testServer := httptest.NewServer(testHandler)
@@ -46,7 +51,7 @@ func Test_handler(t *testing.T) {
 
 		res, err := http.Get(testServer.URL)
 		if err != nil {
-			 t.Fatal(err)
+			t.Fatal(err)
 		}
 
 		if res.StatusCode != 503 {
@@ -73,7 +78,7 @@ func Test_handler(t *testing.T) {
 
 		res, err := http.Get(testServer.URL)
 		if err != nil {
-			 t.Fatal(err)
+			t.Fatal(err)
 		}
 
 		if res.StatusCode != 503 {
@@ -82,6 +87,45 @@ func Test_handler(t *testing.T) {
 
 		if actual := res.Header.Get("Retry-After"); actual != "" {
 			t.Errorf("Retry-Afterが存在する, actual: %s", actual)
+		}
+	})
+
+	t.Run("メソッドがOPTIONSの場合、200で終了しRetry-Afterヘッダが存在しない", func(t *testing.T) {
+		setUpEnv(t, ENV_KEY, SUCCESS_ENV_VALUE)
+		testHandler := http.HandlerFunc(handler)
+		testServer := httptest.NewServer(testHandler)
+		t.Cleanup(testServer.Close)
+		req, _ := http.NewRequest("OPTIONS", testServer.URL, nil)
+		res := httptest.NewRecorder()
+		testServer.Config.Handler.ServeHTTP(res, req)
+
+		if res.Code != 200 {
+			t.Errorf("終了ステータスが200でない, actual: %d", res.Code)
+		}
+
+		if actual := res.Header().Get("Retry-After"); actual != "" {
+			t.Errorf("Retry-Afterが存在する, actual: %s", actual)
+		}
+	})
+
+	t.Run("CORS対応を確認", func(t *testing.T) {
+		testHandler := http.HandlerFunc(handler)
+		testServer := httptest.NewServer(testHandler)
+		t.Cleanup(testServer.Close)
+		
+		res, err := http.Get(testServer.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if expected, actual := "*", res.Header.Get("Access-Control-Allow-Headers"); actual != expected {
+			t.Errorf("Access-Control-Allow-Headersが%sでない, actual: %s", expected, actual)
+		}
+		if expected, actual := "*", res.Header.Get("Access-Control-Allow-Origin"); actual != expected {
+			t.Errorf("Access-Control-Allow-Originが%sでない, actual: %s", expected, actual)
+		}
+		if expected, actual := "GET, POST, PUT, DELETE, OPTIONS", res.Header.Get("Access-Control-Allow-Methods"); actual != expected {
+			t.Errorf("Access-Control-Allow-Methodsが%sでない, actual: %s", expected, actual)
 		}
 	})
 }

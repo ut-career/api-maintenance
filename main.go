@@ -30,6 +30,12 @@ func getRetryAfter() (string, error) {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Headers", "*")
+  w.Header().Set("Access-Control-Allow-Origin", "*")
+  w.Header().Set("Access-Control-Allow-Methods","GET, POST, PUT, DELETE, OPTIONS")
+	if r.Method == "OPTIONS" {
+		return
+	}
 	retryAfter, err := getRetryAfter()
 	if err == nil {
 		w.Header().Add("Retry-After", retryAfter)
