@@ -36,6 +36,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "OPTIONS" {
 		return
 	}
+	w.Header().Set("Access-Control-Expose-Headers", "Retry-After")
 	retryAfter, err := getRetryAfter()
 	if err == nil {
 		w.Header().Add("Retry-After", retryAfter)
