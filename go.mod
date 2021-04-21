@@ -1,3 +1,3 @@
-module api-maintenance
+module apiMaintenance
 
 go 1.15

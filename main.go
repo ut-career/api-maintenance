@@ -1,4 +1,4 @@
-package main
+package apiMaintenance
 
 import (
 	"errors"
@@ -45,7 +45,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Sorry. We're under maintenance.")
 }
 
-func main() {
+func Main() {
 	http.HandleFunc("/", handler)
 	http.ListenAndServe(":8080", nil)
 }
